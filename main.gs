@@ -1,35 +1,3 @@
-function go(){
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  // get value of the top right cell, which holds the name of the json file
-  var jsonName = sheet.getRange('A1').getValue();
-
-  // fetch file from google drive and parse it
-  var persons = parseJSONfromDrive(jsonName);
-
-  // remove nonmember objects in the array of people
-  persons = shaveNonmembers(persons);
-
-  // sort the objects in persons[] by Last Name, then secondly by age
-  persons = sortByAtt(persons,"lastName","ageCategoryId");
-
-  // compress people objects into households
-  var data = householdSquish(persons);
-
-  // orient spreadsheet based on selected cell
-  const topRowNum = sheet.getActiveCell().getRow(); // user can select what row to begin the table at, if they want some empty header rows
-
-  // header row
-  var headers = ["Last Name","First Name","Status","Last Contact","Last Dinner","Received Ward Plan?","Commitments made","Kept commitments?","References"];
-  sheet.getRange(topRowNum,1,1,headers[0].length).setValues([headers]);
-
-  // copy household array to the spreadsheet
-  sheet.getRange(topRowNum+1,1,data.length,data[0].length).setValues(data);
-
-  // apply formatting rules!!!
-  formatSheet(sheet,topRowNum);
-}
-
-
 // fetch file from google drive and parse it
 function parseJSONfromDrive(fileName){
   // search Google Drive for the file
@@ -64,17 +32,6 @@ function shaveNonmembers(persons){
   return persons;
 }
 
-// order an array of objects or an array of arrays by a specific attribute/index
-function sortByAtt(arr, key, key2=null){ // arr must contain objects or arrays
-  return arr.sort(
-    (a,b) => // describe how to compare the objects
-    ( a[key]>b[key] )? 1:
-      (a[key] === b[key])? ((a[key2] < b[key2]) ? 1 : -1)
-    :-1
-  );
-} ////TODO////
-
-
 // compress people objects into households
 function householdSquish(persons){
   // we want an array of household IDs so we can search them
@@ -108,4 +65,30 @@ function formatSheet(sheet,topRowNum){
   ////TODO////
 };
 
+function go(){
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  // get value of the top right cell, which holds the name of the json file
+  var jsonName = sheet.getRange('A1').getValue();
 
+  // fetch file from google drive and parse it
+  var persons = parseJSONfromDrive(jsonName);
+
+  // remove nonmember objects in the array of people
+  persons = shaveNonmembers(persons);
+
+  // compress people objects into households
+  var data = householdSquish(persons);
+
+  // orient spreadsheet based on selected cell
+  const topRowNum = sheet.getActiveCell().getRow(); // user can select what row to begin the table at, if they want some empty header rows
+
+  // header row
+  var headers = ["Last Name","First Name","Status","Last Contact","Last Dinner","Received Ward Plan?","Commitments made","Kept commitments?","References"];
+  sheet.getRange(topRowNum,1,1,headers[0].length).setValues([headers]);
+
+  // copy household array to the spreadsheet
+  sheet.getRange(topRowNum+1,1,data.length,data[0].length).setValues(data);
+
+  // apply formatting rules!!!
+  formatSheet(sheet,topRowNum);
+}
