@@ -9,11 +9,12 @@ function go(){
   // remove nonmember objects in the array of people
   persons = shaveNonmembers(persons);
 
-  // sort the objects in persons[] by Last Name, then secondly by age
-  persons = sortByAtt(persons,"lastName","ageCategoryId");
-
+  // sort the objects in persons[] by household, then secondly by age
+  persons = sortByAtt(persons,"householdGuid",true,"ageCategoryId",false);
   // compress people objects into households
   var data = householdSquish(persons);
+  // now that the households have been condensed, we can sort them by last name without worrying about multiple last names in one household
+  data = sortByAtt(data,0);
 
   // orient spreadsheet based on selected cell
   const topRowNum = sheet.getActiveCell().getRow(); // user can select what row to begin the table at, if they want some empty header rows
@@ -21,12 +22,14 @@ function go(){
   // header row
   var headers = ["Last Name","First Name","Status","Last Contact","Last Dinner","Received Ward Plan?","Commitments made","Kept commitments?","References"];
   sheet.getRange(topRowNum,1,1,headers[0].length).setValues([headers]);
+  console.log(topRowNum);
 
   // copy household array to the spreadsheet
   sheet.getRange(topRowNum+1,1,data.length,data[0].length).setValues(data);
 
   // apply formatting rules!!!
-  formatSheet(sheet,topRowNum);
+  var dataRange = sheet.getRange(topRowNum,1,data.length+1,headers[0].length);
+  formatSheet(dataRange);
 }
 
 
@@ -65,14 +68,17 @@ function shaveNonmembers(persons){
 }
 
 // order an array of objects or an array of arrays by a specific attribute/index
-function sortByAtt(arr, key, key2=null){ // arr must contain objects or arrays
+function sortByAtt(arr, key, ascending=true, key2=null, ascending2=true){ // arr must contain objects or arrays
+  // we want to be able to compare ascending or descending
+  function dComp(val1,val2,isGreater){return (isGreater? val1>val2 : val2>val1);}
   return arr.sort(
-    (a,b) => // describe how to compare the objects
-    ( a[key]>b[key] )? 1:
-      (a[key] === b[key])? ((a[key2] < b[key2]) ? 1 : -1)
+    (a,b) => // describe how to compare the objects/arrays
+    dComp(a[key],b[key],ascending)? 1: // compare primary key values, greater than or less then based on {ascending}
+      (a[key] === b[key])? ( dComp(a[key2],b[key2],ascending2)?1:-1 )
     :-1
   );
 }
+
 
 // compress people objects into households
 function householdSquish(persons){
@@ -97,11 +103,14 @@ function householdSquish(persons){
       data[hloc][1] += ", " + persons[p]["firstName"]; // append the person's name to the list of first names in the household
     }
   }
+  // underscorejs.org/#sortBy
 
   return data;
 }
 
 // formatting to make everything pretty
-function formatSheet(sheet,topRowNum){
-  ////TODO////
+function formatSheet(dataRange){
+  dataRange.applyRowBanding(SpreadsheetApp.BandingTheme.BLUE);
 };
+
+
