@@ -1,3 +1,4 @@
+// main function
 function go(){
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   // get value of the top right cell, which holds the name of the json file
@@ -68,15 +69,23 @@ function shaveNonmembers(persons){
 }
 
 // order an array of objects or an array of arrays by a specific attribute/index
-function sortByAtt(arr, key, ascending=true, key2=null, ascending2=true){ // arr must contain objects or arrays
+function sortByAtt(arr, key, ascending, key2, ascending2){ // arr must contain objects or arrays
+  // add default values
+  ascending = ascending || true;
+  ascending2 = ascending2 || true;
+
   // we want to be able to compare ascending or descending
   function dComp(val1,val2,isGreater){return (isGreater? val1>val2 : val2>val1);}
-  return arr.sort(
-    (a,b) => // describe how to compare the objects/arrays
-    dComp(a[key],b[key],ascending)? 1: // compare primary key values, greater than or less then based on {ascending}
-      (a[key] === b[key])? ( dComp(a[key2],b[key2],ascending2)?1:-1 )
-    :-1
-  );
+  function customSort(a,b){
+    if(dComp(a[key],b[key],ascending)){ // a[key] is greater than b[key]
+      return 1;
+    }else if(a[key]===b[key]){ // fall to next comparator
+      return ( dComp(a[key2],b[key2],ascending2)?1:-1 ); // compare secondary variables
+    }else{ // a[key] is less than b[key]
+      return -1;
+    }
+  }
+  return arr.sort( customSort );
 }
 
 
@@ -110,7 +119,14 @@ function householdSquish(persons){
 
 // formatting to make everything pretty
 function formatSheet(dataRange){
+  // alternating colors
   dataRange.applyRowBanding(SpreadsheetApp.BandingTheme.BLUE);
+  // https://developers.google.com/apps-script/reference/spreadsheet/data-validation-builder?hl=en#requireValueInList(String)
+
+  /* TODO
+  --> pass header values and allow column number lookup, instead of hard-coding column numbers into each format rule
+  --> status dropdowns: unknown,active,returning,less active,inactive,hostile,moved,other
+  --> conditional color formatting for dates
+  --> allow user to select which formatting rules / headers to implement
+  */
 };
-
-
