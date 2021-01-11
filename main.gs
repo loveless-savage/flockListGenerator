@@ -30,7 +30,7 @@ function go(){
 
   // apply formatting rules!!!
   var dataRange = sheet.getRange(topRowNum,1,data.length+1,headers[0].length);
-  formatSheet(dataRange);
+  formatSheet(sheet,dataRange,headers);
 }
 
 
@@ -118,15 +118,30 @@ function householdSquish(persons){
 }
 
 // formatting to make everything pretty
-function formatSheet(dataRange){
-  // alternating colors
+function formatSheet(sheet,dataRange,headers){
+ // alternating colors
   dataRange.applyRowBanding(SpreadsheetApp.BandingTheme.BLUE);
-  // https://developers.google.com/apps-script/reference/spreadsheet/data-validation-builder?hl=en#requireValueInList(String)
 
-  /* TODO
-  --> pass header values and allow column number lookup, instead of hard-coding column numbers into each format rule
-  --> status dropdowns: unknown,active,returning,less active,inactive,hostile,moved,other
-  --> conditional color formatting for dates
-  --> allow user to select which formatting rules / headers to implement
-  */
+ // now we need a quick way to extract a single column from the given range
+  function extractColumn(headerName){
+    return sheet.getRange( // getRange(row,column,numRows) returns one column
+      dataRange.getRow()+1, // getRow()+1 to skip headers
+      headers.indexOf(headerName)+1, // +1 to convert array numbering [0,1..n-1] to sheet numbering [1,2..n]
+      dataRange.getLastRow() // end range at bottom of data
+    );
+  }
+
+ // Status dropdown
+  // these are the typical options for member statuses
+  var statusList = ["unknown","active","returning","less active","inactive","hostile","moved","other"];
+  // give the array of member statuses to a dropdown data structure, which is called data validation
+  var statusRule = SpreadsheetApp.newDataValidation().requireValueInList(statusList).build();
+  // locate the "Status" column among the headers and apply the dropdown rules
+  extractColumn("Status").setDataValidation(statusRule);
+
 };
+
+/* TODO
+--> conditional color formatting for dates
+--> allow user to select which formatting rules / headers to implement
+*/
