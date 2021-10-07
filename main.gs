@@ -23,9 +23,9 @@ function go(){
   // header row
   var headers = ["Last Name","First Name","Status","Last Contact","Last Dinner","Received Ward Plan?","Commitments made","Kept commitments?","References"];
   sheet.getRange(topRowNum,1,1,headers[0].length).setValues([headers]);
-  console.log("starting on row " + topRowNum);
  
   // copy household array to the spreadsheet
+  console.log("Entering data into the spreadsheet on row " + topRowNum);
   sheet.getRange(topRowNum+1,1,data.length,data[0].length).setValues(data);
  
   // apply formatting rules!!!
@@ -62,6 +62,7 @@ function dumpRawData(){
  
 // fetch file from google drive and parse it
 function parseJSONfromDrive(fileName){
+  console.log("Fetching data file from google drive...");
   // search Google Drive for the file
   var jsonFiles = DriveApp.getFilesByName(fileName);
   // Drive doesn't understand how to fetch text from a file, so pull the contents as binary (blob) first, and then interpret as a string
@@ -80,6 +81,7 @@ function parseJSONfromDrive(fileName){
  
 // remove nonmember objects in the array of people
 function shaveNonmembers(persons){
+  console.log("Extracting member data from file...");
   // all members will have an empty cell under the key "missionName", but nonmembers will have the name of the mission
   // online people will have empty cells for "missionName" like members, but they have an ID number in "stewardCmisId"- all other dots have an empty cell here
   // delete all person rows with something in missionName
@@ -117,6 +119,7 @@ function sortByAtt(arr, key, ascending, key2, ascending2){ // arr must contain o
  
 // compress people objects into households
 function householdSquish(persons){
+  console.log("Compressing individuals into households...");
   // we want an array of household IDs so we can search them
   var houses = [];
   var data = [];
@@ -145,13 +148,17 @@ function householdSquish(persons){
  
 // formatting to make everything pretty
 function formatSheet(sheet,dataRange,topRowNum,headers){
+  console.log("Applying formatting rules:");
   // alternating colors
-  dataRange.applyRowBanding(SpreadsheetApp.BandingTheme.BLUE);
+  console.log(" '-> Alternating colors");
+  if(dataRange.getBandings()==="") dataRange.applyRowBanding(SpreadsheetApp.BandingTheme.BLUE); // don't apply if bandings are already present!
   // center align & allow text wrapping in all cells
+  console.log(" '-> Text centered & wrapping");
   dataRange.setHorizontalAlignment("center");
   dataRange.setVerticalAlignment("middle");
   dataRange.setWrap(true);
   // freeze last name column & header row
+  console.log(" '-> Frozen header row & column");
   sheet.setFrozenColumns(1);
   sheet.setFrozenRows(topRowNum);
  
@@ -165,6 +172,7 @@ function formatSheet(sheet,dataRange,topRowNum,headers){
   }
  
  // Status dropdown
+  console.log(" '-> Activity level dropdowns for status column");
   // these are the typical options for member statuses
   var statusList = ["unknown","active","returning","less active","inactive","hostile","moved","other"];
   // give the array of member statuses to a dropdown data structure, which is called data validation
@@ -174,10 +182,73 @@ function formatSheet(sheet,dataRange,topRowNum,headers){
     .build();
   // locate the "Status" column among the headers and apply the dropdown rules
   extractColumn("Status").setDataValidation(statusRule);
- 
+
+ // conditional formatting
+  console.log(" '-> Automatic date coloring in Last Contact / Dinner columns");
+  // the conditional formatting rules are stored in a global stack, which we will copy
+  var ruleMasterList = sheet.getConditionalFormatRules(); // once we're done modifying this copy, we will use it to update the original
+
+  // colorRule is a temporary variable which we will use to pass the constructed rule to our stack
+  var colorRule = SpreadsheetApp.newConditionalFormatRule() // turn the date cells dark red w/ white text if they say NONE
+    .whenTextEqualTo("NONE")
+    .setBackground("#8A3535").setFontColor("#FFFFFF")
+    .setRanges( [extractColumn("Last Contact"),extractColumn("Last Dinner")] ) // this applies to both date columns
+    .build();
+  ruleMasterList.push(colorRule);
+
+  // now we're going to loop through numbers of days associated with colors
+  var daysForLastContact = [ // one array for each column, since they're tuned slightly different
+    {days:7,color:"#77C58C"},
+    {days:15,color:"#B7E1CD"},
+    {days:30,color:"#FFD966"},
+    {days:60,color:"#F6B26B"}
+  ];
+  var daysForLastDinner = [ // days for last dinner are tuned bigger, because it's not as pressing as having a recent contact
+    {days:7,color:"#77C58C"},
+    //{days:15,color:"#B7E1CD"}, // no light green!
+    {days:42,color:"#FFD966"},
+    {days:90,color:"#F6B26B"}
+  ];
+
+  // now loop through both columns separately
+  daysForLastContact.forEach(function(step){ // step through each mini-object in the array (Last Contact column)
+    colorRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(
+        "=" + // TODO
+        extractColumn("Last Contact").getA1Notation().split(":")[0] + // this complicated thing here just pulls out the address of the top cell
+        ">TODAY()-" +
+        step.days // step is a copy of the current element of daysForLastContact[]
+      )
+      .setBackground(step.color) // step contains .days and .color
+      .setRanges([ extractColumn("Last Contact") ])
+      .build();
+    ruleMasterList.push(colorRule);
+  });
+  daysForLastDinner.forEach(function(step){ // step through each mini-object in the array (Last Dinner column)
+    colorRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(
+        "=" + // TODO
+        extractColumn("Last Dinner").getA1Notation().split(":")[0] + // this complicated thing here just pulls out the address of the top cell
+        ">TODAY()-" +
+        step.days // step is a copy of the current element of daysForLastContact[]
+      )
+      .setBackground(step.color) // step contains .days and .color
+      .setRanges([ extractColumn("Last Dinner") ])
+      .build();
+    ruleMasterList.push(colorRule);
+  });
+
+  colorRule = SpreadsheetApp.newConditionalFormatRule() // turn the date cells gray if they aren't empty
+    .whenCellNotEmpty()
+    .setBackground("#B7B7B7")
+    .setRanges( [extractColumn("Last Contact"),extractColumn("Last Dinner")] ) // this applies to both date columns
+    .build();
+  ruleMasterList.push(colorRule);
+
+  sheet.setConditionalFormatRules(ruleMasterList);
+
 };
  
 /* TODO
---> conditional color formatting for dates
 --> allow user to select which formatting rules / headers to implement (advanced)
 */
